@@ -218,11 +218,12 @@
     storage.set(HISTORY_KEY, list);
   }
 
-  // 上次运行残留的未归档会话（关闭或被强杀前落盘的）转入历史，本次计时从零开始
+  // 上次运行残留的未归档会话（关闭或被强杀前落盘的）转入历史，本次计时从零开始；
+  // 不足 1 分钟的会话视为误触/试听，不记录
   function recoverPreviousSession() {
     const prev = storage.get(SESSION_KEY);
     storage.remove(SESSION_KEY);
-    if (prev && typeof prev.d === 'number' && prev.d >= 1000) {
+    if (prev && typeof prev.d === 'number' && prev.d >= 60 * 1000) {
       appendHistory({ t: typeof prev.t === 'number' ? prev.t : Date.now(), d: prev.d });
     }
   }

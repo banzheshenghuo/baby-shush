@@ -263,7 +263,7 @@ advanceClock(5000);
 appG.tick();
 assert.strictEqual(appG.els.timer.textContent, '本次 00:10', '恢复播放应从原值继续累加');
 
-// ---------- 场景 H：关闭应用 → 上次时长归档进历史，重新进入计时归零 ----------
+// ---------- 场景 H：关闭应用 → 满 1 分钟才归档，不足丢弃，重新进入计时归零 ----------
 appG.fireWindow('pagehide');
 assert.strictEqual(JSON.parse(appG.store.get('babyShush.session')).d, 10000, '关闭时应落盘会话时长');
 advanceClock(60000);
@@ -271,26 +271,35 @@ const appH = loadApp();
 await flush();
 assert.strictEqual(appH.els.timer.textContent, '本次 00:00', '重新进入后本次计时归零');
 assert.strictEqual(appH.store.has('babyShush.session'), false, '残留会话应被清理');
-const hist1 = JSON.parse(appH.store.get('babyShush.history'));
-assert.strictEqual(hist1.length, 1, '历史应有 1 条记录');
-assert.strictEqual(hist1[0].d, 10000, '历史时长应为上一会话的 10 秒');
+assert.strictEqual(appH.store.has('babyShush.history'), false, '不足 1 分钟的会话不应记录历史');
+
+// 播满 1 分钟以上再关闭，才会归档
+advanceClock(61000);
+appH.tick();
+appH.fireWindow('pagehide');
+advanceClock(60000);
+const appH2 = loadApp();
+await flush();
+const hist1 = JSON.parse(appH2.store.get('babyShush.history'));
+assert.strictEqual(hist1.length, 1, '超过 1 分钟的会话应归档');
+assert.strictEqual(hist1[0].d, 61000, '历史时长应为上一会话的 61 秒');
 
 // ---------- 场景 I：历史记录面板（查看 / 关闭 / 清空） ----------
 advanceClock(65000);
-appH.tick();
-assert.strictEqual(appH.els.timer.textContent, '本次 01:05', '新会话从零重新计时');
-appH.els.historyBtn.click();
-assert.strictEqual(appH.els.historyModal.hidden, false, '应打开历史面板');
-assert.strictEqual(appH.els.historyTotal.textContent, '共 1 次 · 累计 10秒', '汇总行正确');
-const liRow = appH.els.historyList.children[0];
+appH2.tick();
+assert.strictEqual(appH2.els.timer.textContent, '本次 01:05', '新会话从零重新计时');
+appH2.els.historyBtn.click();
+assert.strictEqual(appH2.els.historyModal.hidden, false, '应打开历史面板');
+assert.strictEqual(appH2.els.historyTotal.textContent, '共 1 次 · 累计 1分01秒', '汇总行正确');
+const liRow = appH2.els.historyList.children[0];
 assert.ok(liRow.children[0].textContent.includes('8月22日'), '记录应含日期');
-assert.strictEqual(liRow.children[1].textContent, '10秒', '记录时长正确');
-appH.els.historyClose.click();
-assert.strictEqual(appH.els.historyModal.hidden, true, '应能关闭历史面板');
-appH.els.historyBtn.click();
-appH.els.historyClear.click();
-assert.strictEqual(appH.els.historyList.children.length, 0, '清空后列表为空');
-assert.ok(appH.els.historyList.innerHTML.includes('还没有哄睡记录'), '清空后应有空态提示');
+assert.strictEqual(liRow.children[1].textContent, '1分01秒', '记录时长正确');
+appH2.els.historyClose.click();
+assert.strictEqual(appH2.els.historyModal.hidden, true, '应能关闭历史面板');
+appH2.els.historyBtn.click();
+appH2.els.historyClear.click();
+assert.strictEqual(appH2.els.historyList.children.length, 0, '清空后列表为空');
+assert.ok(appH2.els.historyList.innerHTML.includes('还没有哄睡记录'), '清空后应有空态提示');
 
 console.log('✓ 场景A：进入页面自动播放（loop、本地录音音源、播放态 UI 正确）');
 console.log('✓ 场景B：点按呼吸圆圈在 播放/暂停 间切换，文案与样式同步');
@@ -299,5 +308,5 @@ console.log('✓ 场景D：锁屏/耳机播放暂停控件与元数据（Media S
 console.log('✓ 场景E：合成兜底 WAV 格式、长度与确定性校验通过');
 console.log('✓ 场景F：录音加载失败时自动回退合成音源并续播，且回退只发生一次');
 console.log('✓ 场景G：播放计时走表 / 暂停停表 / 恢复继续累加');
-console.log('✓ 场景H：关闭应用时上次时长归档进历史，重新进入本次计时归零');
+console.log('✓ 场景H：满 1 分钟的会话才归档进历史（不足 1 分钟丢弃），重新进入本次计时归零');
 console.log('✓ 场景I：历史记录面板的查看、汇总、关闭与清空');
