@@ -39,6 +39,7 @@ function makeElement(id) {
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
     click() { (this.listeners.click || []).forEach(fn => fn({ target: this })); },
     fire(type) { (this.listeners[type] || []).forEach(fn => fn({ target: this })); },
+    closest() { return null; },
     append(...kids) { (this.children ||= []).push(...kids); },
   };
   Object.defineProperty(el, 'innerHTML', {
@@ -141,7 +142,7 @@ function loadApp({ blocked = false } = {}) {
     generateShushWav: sandbox.__babyShush.generateShushWav,
     isUsingFallback: sandbox.__babyShush.isUsingFallback,
     tick: () => intervalFns.forEach(fn => fn()),
-    fireWindow: (t) => (winListeners[t] || []).forEach(fn => fn()),
+    fireWindow: (t, ev) => (winListeners[t] || []).forEach(fn => fn(ev)),
   };
 }
 
@@ -165,15 +166,42 @@ appA.els.circle.click();
 await flush();
 assert.ok(!appA.audio.paused, '暂停中点按应继续播放');
 
-// ---------- 场景 C：自动播放被拦截 → 轻触圆圈开始 ----------
+// ---------- 场景 C：自动播放被拦截 → 轻触屏幕任意位置开始 ----------
 const appC = loadApp({ blocked: true });
 await flush();
 assert.ok(appC.audio.paused, '被拦截时应保持暂停');
 assert.strictEqual(appC.els.stateLabel.textContent, '轻触开始', '应提示轻触开始');
+assert.strictEqual(appC.els.hint.textContent, '轻触屏幕任意位置开始播放', '应提示可轻触任意位置');
 appC.els.circle.click();
 await flush();
-assert.ok(!appC.audio.paused, '轻触后应开始播放');
+assert.ok(!appC.audio.paused, '轻触圆圈后应开始播放');
 assert.strictEqual(appC.els.stateLabel.textContent, '嘘…');
+
+// C2：轻触屏幕任意位置（非圆圈）也应开始播放
+const appC2 = loadApp({ blocked: true });
+await flush();
+appC2.fireWindow('pointerdown', { target: appC2.els.hint });
+await flush();
+assert.ok(!appC2.audio.paused, '轻触屏幕任意位置应能开始播放');
+assert.strictEqual(appC2.els.stateLabel.textContent, '嘘…');
+
+// C3：点在圆圈上的触摸交给圆圈自身的 click 处理，全局手势不应抢先启动
+const appC3 = loadApp({ blocked: true });
+await flush();
+appC3.fireWindow('pointerdown', { target: { closest: (sel) => (sel === '#circle' ? {} : null) } });
+await flush();
+assert.ok(appC3.audio.paused, '点在圆圈上的触摸不应由全局手势启动（避免随后的 click 误判为暂停）');
+appC3.els.circle.click();
+await flush();
+assert.ok(!appC3.audio.paused, '圆圈 click 正常启动播放');
+
+// C4：播放过后再点屏幕任意位置不应误触发播放（hasStarted 保护）
+appC2.els.circle.click();      // 暂停
+await flush();
+assert.ok(appC2.audio.paused, '暂停成功');
+appC2.fireWindow('pointerdown', { target: appC2.els.hint });
+await flush();
+assert.ok(appC2.audio.paused, '播放过之后，非圆圈触摸不应改变状态');
 
 // ---------- 场景 D：锁屏控件（Media Session） ----------
 assert.strictEqual(typeof appA.msHandlers.play, 'function', '应注册 play 处理器');
@@ -266,7 +294,7 @@ assert.ok(appH.els.historyList.innerHTML.includes('还没有哄睡记录'), '清
 
 console.log('✓ 场景A：进入页面自动播放（loop、本地录音音源、播放态 UI 正确）');
 console.log('✓ 场景B：点按呼吸圆圈在 播放/暂停 间切换，文案与样式同步');
-console.log('✓ 场景C：自动播放被浏览器拦截时提示「轻触开始」，轻触后正常播放');
+console.log('✓ 场景C：自动播放被浏览器拦截时，轻触屏幕任意位置或圆圈即可开始，播放后任意触摸不误触');
 console.log('✓ 场景D：锁屏/耳机播放暂停控件与元数据（Media Session）正确；音量交由设备硬件控制');
 console.log('✓ 场景E：合成兜底 WAV 格式、长度与确定性校验通过');
 console.log('✓ 场景F：录音加载失败时自动回退合成音源并续播，且回退只发生一次');

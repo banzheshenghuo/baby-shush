@@ -79,8 +79,9 @@
   const audio = new Audio();
   audio.loop = true;
   audio.preload = 'auto';
+  audio.autoplay = true; // 数据就绪即刻起播；play() 再主动触发一次双保险
 
-  let hasStarted = false; // 是否发生过用户交互（区分「未开始」与「已暂停」文案）
+  let hasStarted = false; // 是否真正播放过（区分「未开始」与「已暂停」文案）
   let usingFallback = false; // 录音加载失败后切换为程序化合成音源
 
   function updateUI() {
@@ -89,7 +90,7 @@
     stateLabel.textContent = playing ? '嘘…' : (hasStarted ? '已暂停' : '轻触开始');
     hint.textContent = playing
       ? '轻触圆圈暂停 · 锁屏 / 息屏继续播放'
-      : (hasStarted ? '轻触圆圈继续' : '轻触中间的圆圈开始播放');
+      : (hasStarted ? '轻触圆圈继续' : '轻触屏幕任意位置开始播放');
     if (navigator.mediaSession) {
       navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
     }
@@ -104,7 +105,6 @@
   }
 
   circle.addEventListener('click', () => {
-    hasStarted = true;
     if (audio.paused) {
       tryPlay();
     } else {
@@ -112,8 +112,16 @@
     }
   });
 
+  // 自动播放被浏览器策略拦截时，轻触屏幕任意位置即可开始（点在圆圈上仍交给圆圈自身处理）
+  window.addEventListener('pointerdown', (e) => {
+    if (hasStarted || !audio.paused) return;
+    if (e && e.target && e.target.closest && e.target.closest('#circle')) return;
+    tryPlay();
+  });
+
   // 播放状态变化统一由元素事件驱动（锁屏控件、耳机按键也会触发）
-  audio.addEventListener('play', updateUI);
+  // hasStarted 以「真正出过声」为准：手势兜底、圆圈点按、锁屏控件都能置位
+  audio.addEventListener('play', () => { hasStarted = true; updateUI(); });
   audio.addEventListener('pause', updateUI);
 
   // 录音文件加载失败（如缓存被清理且离线）时，回退到程序化合成，保证页面始终有声
