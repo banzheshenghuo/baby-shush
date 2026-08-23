@@ -5,8 +5,8 @@
   const stateLabel = document.getElementById('stateLabel');
   const hint = document.getElementById('hint');
 
-  // ---------- 「嘘」声音源：程序化生成（棕噪声 + 缓慢起伏 + 首尾交叉淡化的无缝循环） ----------
-  // 用固定种子保证每次生成的声音一致
+  // ---------- 「嘘」声兜底音源：程序化合成（棕噪声 + 缓慢起伏 + 首尾交叉淡化的无缝循环） ----------
+  // 常规播放使用本地录音 audio/xuxu.mp3；仅当录音加载失败时回退到这里。固定种子保证每次生成一致
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
@@ -48,7 +48,7 @@
       }
     }
 
-    // 峰值归一化到 0.35（约 -9 dBFS，柔和起始音量，具体由音量条调节）
+    // 峰值归一化到 0.35（约 -9 dBFS，柔和音量，最终由设备音量键调节）
     let peak = 0;
     for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[i]));
     const gain = peak > 0 ? 0.35 / peak : 1;
@@ -75,11 +75,13 @@
   }
 
   // ---------- 播放（HTMLAudioElement：可被系统媒体通知接管，锁屏 / 息屏继续播放） ----------
+  const AUDIO_FILE = 'audio/xuxu.mp3'; // 随仓库分发的真实「嘘」声录音，循环播放
   const audio = new Audio();
   audio.loop = true;
   audio.preload = 'auto';
 
   let hasStarted = false; // 是否发生过用户交互（区分「未开始」与「已暂停」文案）
+  let usingFallback = false; // 录音加载失败后切换为程序化合成音源
 
   function updateUI() {
     const playing = !audio.paused;
@@ -114,6 +116,14 @@
   audio.addEventListener('play', updateUI);
   audio.addEventListener('pause', updateUI);
 
+  // 录音文件加载失败（如缓存被清理且离线）时，回退到程序化合成，保证页面始终有声
+  audio.addEventListener('error', () => {
+    if (usingFallback || audio.src.startsWith('blob:')) return;
+    usingFallback = true;
+    audio.src = URL.createObjectURL(generateShushWav());
+    tryPlay();
+  });
+
   // ---------- 锁屏 / 耳机 / 车载控制（Media Session） ----------
   if ('mediaSession' in navigator) {
     try {
@@ -134,9 +144,9 @@
     }
   }
 
-  // ---------- 启动：生成音源并尝试自动播放 ----------
+  // ---------- 启动：加载录音并尝试自动播放 ----------
   (function init() {
-    audio.src = URL.createObjectURL(generateShushWav());
+    audio.src = AUDIO_FILE;
     updateUI();
     tryPlay(); // 进入页面即播放；被浏览器策略拦截时等待轻触圆圈
   })();
@@ -149,5 +159,5 @@
   }
 
   // 供仿真测试与调试使用
-  window.__babyShush = { audio, generateShushWav };
+  window.__babyShush = { audio, generateShushWav, isUsingFallback: () => usingFallback };
 })();

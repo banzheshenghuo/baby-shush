@@ -2,7 +2,8 @@
 //
 // 原理：把真实的 app.js 放入 Node 虚拟机，用模拟的 Audio/MediaSession/localStorage 驱动，
 // 断言：自动播放尝试、点按呼吸圆圈切换播放/暂停、被浏览器拦截后的兜底流程、
-//       锁屏控件（Media Session handlers）、音量交由设备控制、WAV 音源格式与确定性。
+//       锁屏控件（Media Session handlers）、音量交由设备控制、本地录音音源与加载失败回退、
+//       合成兜底 WAV 的格式与确定性。
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -110,6 +111,7 @@ function loadApp({ blocked = false } = {}) {
     els, store, audioLog, msHandlers, mediaSession,
     audio: sandbox.__babyShush.audio,
     generateShushWav: sandbox.__babyShush.generateShushWav,
+    isUsingFallback: sandbox.__babyShush.isUsingFallback,
   };
 }
 
@@ -119,7 +121,7 @@ await flush();
 assert.strictEqual(appA.audioLog.filter(x => x === 'play').length, 1, '加载后应尝试自动播放一次');
 assert.ok(!appA.audio.paused, '自动播放成功后应为播放中');
 assert.ok(appA.audio.loop, '应循环播放');
-assert.ok(appA.audio.src.startsWith('blob:'), '音源应为 blob URL');
+assert.strictEqual(appA.audio.src, 'audio/xuxu.mp3', '音源应为本地录音文件');
 assert.strictEqual(appA.els.stateLabel.textContent, '嘘…', '状态文案应为 嘘…');
 assert.ok(appA.els.circle.classList.contains('playing'), '圆圈应为播放态样式');
 
@@ -171,8 +173,24 @@ assert.strictEqual(bytes.readUInt16LE(34), 16, '16 位 PCM');
 const bytes2 = Buffer.from(await appD.generateShushWav().arrayBuffer());
 assert.ok(bytes2.equals(bytes), '固定种子应生成完全一致的音源');
 
-console.log('✓ 场景A：进入页面自动播放（loop、blob 音源、播放态 UI 正确）');
+// ---------- 场景 F：录音文件加载失败 → 回退程序化合成并重新播放 ----------
+const appF = loadApp();
+await flush();
+assert.strictEqual(appF.audio.src, 'audio/xuxu.mp3', '初始音源为录音文件');
+assert.ok(!appF.isUsingFallback(), '初始不在回退模式');
+(appF.audio.listeners.error || []).forEach(fn => fn());
+await flush();
+assert.ok(appF.audio.src.startsWith('blob:'), '加载失败后应切换到合成 blob 音源');
+assert.ok(!appF.audio.paused, '回退后应重新尝试播放');
+assert.ok(appF.isUsingFallback(), '应标记为回退模式');
+const before = appF.audio.src;
+(appF.audio.listeners.error || []).forEach(fn => fn());
+await flush();
+assert.strictEqual(appF.audio.src, before, '重复 error 不应再次切换音源');
+
+console.log('✓ 场景A：进入页面自动播放（loop、本地录音音源、播放态 UI 正确）');
 console.log('✓ 场景B：点按呼吸圆圈在 播放/暂停 间切换，文案与样式同步');
 console.log('✓ 场景C：自动播放被浏览器拦截时提示「轻触开始」，轻触后正常播放');
 console.log('✓ 场景D：锁屏/耳机播放暂停控件与元数据（Media Session）正确；音量交由设备硬件控制');
-console.log('✓ 场景E：WAV 音源格式、长度与确定性校验通过');
+console.log('✓ 场景E：合成兜底 WAV 格式、长度与确定性校验通过');
+console.log('✓ 场景F：录音加载失败时自动回退合成音源并续播，且回退只发生一次');

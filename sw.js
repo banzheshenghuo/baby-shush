@@ -1,7 +1,7 @@
 // 嘘嘘哄睡 Service Worker
 // 策略：网络优先 + 缓存回退 —— 在线时始终拿到最新版本，离线时回退到上次缓存
-const CACHE = 'baby-shush-v1';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
+const CACHE = 'baby-shush-v2';
+const ASSETS = ['./', './index.html', './style.css', './app.js', './audio/xuxu.mp3', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
