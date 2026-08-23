@@ -1,0 +1,17 @@
+{
+  "name": "婴儿嘘嘘哄睡",
+  "short_name": "嘘嘘哄睡",
+  "description": "程序生成的「嘘」声白噪音，配合呼吸律动动画，支持锁屏 / 息屏持续播放",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0e1e",
+  "theme_color": "#0b0e1e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

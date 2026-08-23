@@ -1,0 +1,142 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: radial-gradient(1200px 800px at 50% -10%, #232a52 0%, #10142c 55%, #0b0e1e 100%);
+  color: #dfe4f7;
+}
+
+.app {
+  text-align: center;
+  padding: 36px 20px;
+  width: min(92vw, 560px);
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 3px;
+}
+
+.subtitle {
+  margin-top: 10px;
+  color: #9aa3c7;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+/* ---------- 呼吸圆圈（点击播放 / 暂停） ---------- */
+
+.breath-stage {
+  margin: 40px auto 16px;
+  width: 300px;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.breath-circle {
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  border: 1px solid rgba(200, 208, 255, 0.35);
+  background: radial-gradient(circle at 35% 30%, rgba(195, 204, 255, 0.38), rgba(120, 132, 215, 0.20) 60%, rgba(70, 80, 150, 0.10));
+  color: #dfe4f7;
+  font-family: inherit;
+  cursor: pointer;
+  animation: breathe 8s ease-in-out infinite;
+  transition: border-color 1s ease, box-shadow 1s ease;
+  will-change: transform;
+}
+
+.breath-circle.playing {
+  border-color: rgba(215, 222, 255, 0.55);
+  box-shadow: 0 0 70px rgba(150, 160, 255, 0.25), inset 0 0 42px rgba(150, 160, 255, 0.15);
+}
+
+/* 未播放时律动同步暂停 */
+.breath-circle:not(.playing) {
+  animation-play-state: paused;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(0.84); }
+  50% { transform: scale(1.1); }
+}
+
+.state {
+  font-size: 20px;
+  letter-spacing: 4px;
+  padding-left: 4px; /* 补偿字距造成的偏移 */
+  text-shadow: 0 0 14px rgba(160, 170, 255, 0.5);
+}
+
+.breath-circle:active {
+  filter: brightness(1.18);
+}
+
+.breath-circle:focus-visible {
+  outline: 2px solid #b9c3ff;
+  outline-offset: 6px;
+}
+
+/* ---------- 提示与音量 ---------- */
+
+.hint {
+  min-height: 18px;
+  font-size: 13px;
+  color: #8b94bd;
+}
+
+.volume-row {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+}
+
+.field {
+  font-size: 14px;
+  color: #b8c0dd;
+}
+
+input[type="range"] {
+  width: 180px;
+  accent-color: #9aa8ff;
+}
+
+.volume-value {
+  font-size: 13px;
+  color: #9aa3c7;
+  min-width: 42px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.tip {
+  margin-top: 26px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #6c74a0;
+}
+
+/* 尊重系统「减弱动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  .breath-circle {
+    animation: none;
+  }
+}

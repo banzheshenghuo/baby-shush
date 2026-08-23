@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="婴儿嘘嘘哄睡：程序生成的「嘘」声白噪音，配合呼吸律动动画，支持锁屏 / 息屏持续播放">
+  <meta name="theme-color" content="#0b0e1e">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <title>婴儿嘘嘘哄睡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <h1>嘘嘘哄睡</h1>
+    <p class="subtitle">柔和「嘘」声 · 呼吸节奏律动</p>
+
+    <section class="breath-stage" aria-live="polite" aria-atomic="true">
+      <button class="breath-circle" id="circle" aria-label="播放或暂停">
+        <span class="state" id="stateLabel">轻触开始</span>
+      </button>
+    </section>
+
+    <p class="hint" id="hint">轻触中间的圆圈开始播放</p>
+
+    <div class="volume-row">
+      <label class="field" for="volume">音量</label>
+      <input type="range" id="volume" min="0" max="100" value="70">
+      <span class="volume-value" id="volumeValue">70%</span>
+    </div>
+
+    <p class="tip">建议音量由低到高调试，声源距婴儿耳侧约 30–50 cm，配合轻拍安抚效果更好</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
