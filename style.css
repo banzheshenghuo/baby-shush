@@ -21,7 +21,8 @@ body {
 .app {
   text-align: center;
   padding: 36px 20px;
-  width: min(92vw, 560px);
+  width: 92%; /* 用百分比而非 vw：不受滚动条占宽影响，各机型居中一致 */
+  max-width: 560px;
 }
 
 h1 {
@@ -41,7 +42,8 @@ h1 {
 
 .breath-stage {
   margin: 40px auto 16px;
-  width: 300px;
+  width: 100%;      /* 窄屏（<370px 视口）下不再固定 300px 溢出父容器导致圆圈右偏 */
+  max-width: 300px;
   height: 300px;
   display: flex;
   align-items: center;
@@ -49,8 +51,11 @@ h1 {
 }
 
 .breath-circle {
-  width: 210px;
-  height: 210px;
+  width: 74vw;      /* 随视口自适应且保持正方形，大屏回到 210px */
+  max-width: 210px;
+  height: 74vw;
+  max-height: 210px;
+  margin: 0 auto;   /* 兼容旧内核：即使 justify-content 失效也能水平居中 */
   border-radius: 50%;
   border: 1px solid rgba(200, 208, 255, 0.35);
   background: radial-gradient(circle at 35% 30%, rgba(195, 204, 255, 0.38), rgba(120, 132, 215, 0.20) 60%, rgba(70, 80, 150, 0.10));
