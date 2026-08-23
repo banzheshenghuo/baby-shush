@@ -3,7 +3,8 @@
 // 原理：把真实的 app.js 放入 Node 虚拟机，用模拟的 Audio/MediaSession/localStorage 驱动，
 // 断言：自动播放尝试、点按呼吸圆圈切换播放/暂停、被浏览器拦截后的兜底流程、
 //       锁屏控件（Media Session handlers）、音量交由设备控制、本地录音音源与加载失败回退、
-//       合成兜底 WAV 的格式与确定性、播放计时（走表/停表）、关闭归档与历史面板。
+//       合成兜底 WAV 的格式与确定性、播放计时（走表/停表）、关闭归档与历史面板、
+//       定时停止（倒计时展示 / 暂停时继续走 / 到点自动停 / 可取消）。
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -100,12 +101,22 @@ function loadApp({ blocked = false } = {}) {
   };
 
   const els = {};
-  for (const id of ['circle', 'stateLabel', 'hint', 'timer', 'historyBtn', 'historyModal', 'historyClose', 'historyTotal', 'historyList', 'historyClear']) {
+  for (const id of ['circle', 'stateLabel', 'hint', 'timer', 'historyBtn', 'historyModal', 'historyClose', 'historyTotal', 'historyList', 'historyClear', 'sleepTimerBtn', 'sleepTimerModal', 'sleepTimerClose', 'sleepTimerOptions']) {
     els[id] = makeElement(id);
   }
 
+  // 定时面板的选项按钮（真实页面由 querySelectorAll('button[data-min]') 取出）
+  const timerOptionBtns = [0, 15, 30, 60].map((min) => {
+    const b = makeElement('opt' + min);
+    b.dataset = { min: String(min) };
+    return b;
+  });
+  els.sleepTimerOptions.querySelectorAll = () => timerOptionBtns;
+
   const intervalFns = [];
   const winListeners = {};
+  const timeouts = new Map(); // id -> { fn, at }，配合假时钟模拟到点触发
+  let timeoutSeq = 0;
 
   const sandbox = {
     document: {
@@ -123,6 +134,8 @@ function loadApp({ blocked = false } = {}) {
     addEventListener: (t, fn) => { (winListeners[t] ||= []).push(fn); },
     setInterval: (fn) => { intervalFns.push(fn); return intervalFns.length; },
     clearInterval: () => {},
+    setTimeout: (fn, ms) => { const id = ++timeoutSeq; timeouts.set(id, { fn, at: fakeNow + ms }); return id; },
+    clearTimeout: (id) => { timeouts.delete(id); },
     confirm: () => true,
     Date: FakeDate,
     Audio: makeAudioClass(audioLog, blocked),
@@ -143,6 +156,12 @@ function loadApp({ blocked = false } = {}) {
     isUsingFallback: sandbox.__babyShush.isUsingFallback,
     tick: () => intervalFns.forEach(fn => fn()),
     fireWindow: (t, ev) => (winListeners[t] || []).forEach(fn => fn(ev)),
+    fireDueTimeouts: () => {
+      for (const t of [...timeouts.values()]) {
+        if (t.at <= fakeNow) { t.fn(); }
+      }
+    },
+    timerOptionBtns,
   };
 }
 
@@ -301,6 +320,46 @@ appH2.els.historyClear.click();
 assert.strictEqual(appH2.els.historyList.children.length, 0, '清空后列表为空');
 assert.ok(appH2.els.historyList.innerHTML.includes('还没有哄睡记录'), '清空后应有空态提示');
 
+// ---------- 场景 J：定时停止（点选档位 / 倒计时展示 / 暂停时继续走 / 到点自停 / 可取消） ----------
+const appJ = loadApp();
+await flush();
+appJ.els.sleepTimerBtn.click();
+assert.strictEqual(appJ.els.sleepTimerModal.hidden, false, '应打开定时面板');
+assert.ok(appJ.timerOptionBtns[0].classList.contains('active'), '未设置时「不定时」应高亮');
+appJ.timerOptionBtns[1].click(); // 15 分钟
+assert.strictEqual(appJ.els.sleepTimerModal.hidden, true, '点选后面板应关闭');
+advanceClock(60000);
+appJ.tick();
+assert.strictEqual(appJ.els.timer.textContent, '本次 01:00 · 14:00 后停止', '应展示到秒的倒计时');
+
+// 暂停播放时倒计时继续走
+appJ.els.circle.click();
+await flush();
+advanceClock(60000);
+appJ.tick();
+assert.ok(appJ.els.timer.textContent.includes('13:00 后停止'), '暂停时倒计时应继续走');
+
+// 到点：自动停止并清除倒计时展示（+100ms 覆盖触发器的 50ms 保护余量）
+advanceClock(13 * 60000 + 100);
+appJ.fireDueTimeouts();
+await flush();
+assert.ok(appJ.audio.paused, '到点应自动暂停播放');
+assert.ok(!appJ.els.timer.textContent.includes('后停止'), '到点后不应再显示倒计时');
+
+// 取消：重新设置后再选「不定时」，到点不再停止
+appJ.els.circle.click();          // 手动恢复播放
+await flush();
+appJ.els.sleepTimerBtn.click();
+appJ.timerOptionBtns[3].click();  // 1 小时
+appJ.els.sleepTimerBtn.click();
+assert.ok(appJ.timerOptionBtns[3].classList.contains('active'), '选中档位应高亮');
+appJ.timerOptionBtns[0].click();  // 不定时（取消）
+advanceClock(61 * 60000);
+appJ.fireDueTimeouts();
+await flush();
+assert.ok(!appJ.audio.paused, '取消后到点不应停止播放');
+assert.ok(!appJ.els.timer.textContent.includes('后停止'), '取消后不应显示倒计时');
+
 console.log('✓ 场景A：进入页面自动播放（loop、本地录音音源、播放态 UI 正确）');
 console.log('✓ 场景B：点按呼吸圆圈在 播放/暂停 间切换，文案与样式同步');
 console.log('✓ 场景C：自动播放被浏览器拦截时，轻触屏幕任意位置或圆圈即可开始，播放后任意触摸不误触');
@@ -310,3 +369,4 @@ console.log('✓ 场景F：录音加载失败时自动回退合成音源并续�
 console.log('✓ 场景G：播放计时走表 / 暂停停表 / 恢复继续累加');
 console.log('✓ 场景H：满 1 分钟的会话才归档进历史（不足 1 分钟丢弃），重新进入本次计时归零');
 console.log('✓ 场景I：历史记录面板的查看、汇总、关闭与清空');
+console.log('✓ 场景J：定时停止（档位点选、秒级倒计时、暂停续走、到点自停、可取消）');

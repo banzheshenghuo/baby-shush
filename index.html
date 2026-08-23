@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="preload" href="audio/xuxu.mp3" as="audio" type="audio/mpeg">
   <title>婴儿嘘嘘哄睡</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <main class="app">
@@ -29,8 +29,27 @@
 
     <p class="tip">音量请用设备音量键调节 · 建议声源距婴儿耳侧约 30–50 cm，配合轻拍安抚效果更好</p>
 
-    <button class="history-btn" id="historyBtn">历史记录</button>
+    <div class="btn-row">
+      <button class="pill-btn" id="sleepTimerBtn">定时</button>
+      <button class="pill-btn" id="historyBtn">历史记录</button>
+    </div>
   </main>
+
+  <div class="modal" id="sleepTimerModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="定时停止">
+      <div class="modal-head">
+        <h2>定时停止</h2>
+        <button class="modal-close" id="sleepTimerClose" aria-label="关闭定时设置">✕</button>
+      </div>
+      <p class="modal-sub">到点后自动暂停播放</p>
+      <ul class="option-list" id="sleepTimerOptions">
+        <li><button data-min="0">不定时</button></li>
+        <li><button data-min="15">15 分钟</button></li>
+        <li><button data-min="30">30 分钟</button></li>
+        <li><button data-min="60">1 小时</button></li>
+      </ul>
+    </div>
+  </div>
 
   <div class="modal" id="historyModal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-label="历史记录">
@@ -44,6 +63,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

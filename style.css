@@ -123,10 +123,16 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 历史记录 ---------- */
+/* ---------- 底部按钮行（定时 / 历史） ---------- */
 
-.history-btn {
+.btn-row {
   margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.pill-btn {
   background: none;
   border: 1px solid rgba(200, 208, 255, 0.28);
   color: #9aa3c7;
@@ -139,7 +145,7 @@ h1 {
   transition: border-color 0.2s ease, color 0.2s ease;
 }
 
-.history-btn:active {
+.pill-btn:active {
   transform: scale(0.97);
 }
 
@@ -243,6 +249,48 @@ h1 {
   font-family: inherit;
   cursor: pointer;
   padding: 6px 10px;
+}
+
+.modal-sub {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: #8b94bd;
+}
+
+/* 定时选项列表 */
+.option-list {
+  list-style: none;
+}
+
+.option-list button {
+  width: 100%;
+  padding: 14px 8px;
+  margin: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(200, 208, 255, 0.1);
+  color: #dfe4f7;
+  font-size: 15px;
+  font-family: inherit;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.option-list li:last-child button {
+  border-bottom: none;
+}
+
+.option-list button:active {
+  background: rgba(200, 208, 255, 0.08);
+}
+
+.option-list button.active {
+  color: #b9c3ff;
+  font-weight: 600;
+}
+
+.option-list button.active::after {
+  content: " ✓";
 }
 
 /* 尊重系统「减弱动态效果」设置 */

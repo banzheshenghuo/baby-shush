@@ -160,6 +160,10 @@
   const historyTotal = document.getElementById('historyTotal');
   const historyList = document.getElementById('historyList');
   const historyClear = document.getElementById('historyClear');
+  const sleepTimerBtn = document.getElementById('sleepTimerBtn');
+  const sleepTimerModal = document.getElementById('sleepTimerModal');
+  const sleepTimerClose = document.getElementById('sleepTimerClose');
+  const sleepTimerOptions = document.getElementById('sleepTimerOptions');
 
   const HISTORY_KEY = 'babyShush.history';
   const SESSION_KEY = 'babyShush.session';
@@ -175,9 +179,16 @@
   let playingSince = 0;  // 当前连续播放段的起点（墙钟，息屏 / 后台播放照常累计）
   let tickTimer = null;
   let lastFlush = 0;
+  let timerDeadline = 0; // 定时停止截止时刻（墙钟），0 = 未设置
+  let stopTimeout = 0;   // 到点暂停的 setTimeout 句柄
+  let sleepTimerMin = 0; // 当前选中的档位（用于面板高亮）
 
   function sessionMs() {
     return accumulatedMs + (audio.paused || !playingSince ? 0 : Date.now() - playingSince);
+  }
+
+  function remainingMs() {
+    return timerDeadline ? Math.max(0, timerDeadline - Date.now()) : 0;
   }
 
   function fmtClock(ms) { // 本次计时 MM:SS（满 1 小时显示 H:MM:SS）
@@ -201,9 +212,37 @@
   }
 
   function renderTimer() {
-    timerEl.textContent = `本次 ${fmtClock(sessionMs())}`;
+    const rem = remainingMs();
+    timerEl.textContent = rem > 0
+      ? `本次 ${fmtClock(sessionMs())} · ${fmtClock(rem)} 后停止`
+      : `本次 ${fmtClock(sessionMs())}`;
     // 播放中每 10 秒落一次盘，应用被强杀也能在历史里找回这段时长
     if (!audio.paused && Date.now() - lastFlush > 10000) persistSession();
+  }
+
+  // 需要节流刷新的条件：正在播放（本次走表）或定时器生效（倒计时走表，暂停时也要走）
+  function updateTickState() {
+    clearInterval(tickTimer);
+    tickTimer = (!audio.paused || timerDeadline > 0) ? setInterval(renderTimer, 500) : null;
+  }
+
+  function setSleepTimer(min) {
+    clearTimeout(stopTimeout);
+    sleepTimerMin = min;
+    if (min > 0) {
+      timerDeadline = Date.now() + min * 60000;
+      stopTimeout = setTimeout(() => {
+        timerDeadline = 0;
+        sleepTimerMin = 0;
+        if (!audio.paused) audio.pause(); // 到点自动停止
+        updateTickState();
+        renderTimer();
+      }, min * 60000 + 50);
+    } else {
+      timerDeadline = 0;
+    }
+    updateTickState();
+    renderTimer();
   }
 
   function loadHistory() {
@@ -232,16 +271,15 @@
     playingSince = Date.now();
     timerEl.hidden = false;
     renderTimer();
-    clearInterval(tickTimer);
-    tickTimer = setInterval(renderTimer, 500);
+    updateTickState();
   });
 
   audio.addEventListener('pause', () => {
     if (!playingSince) return;
     accumulatedMs += Date.now() - playingSince;
     playingSince = 0;
-    clearInterval(tickTimer);
     renderTimer(); // 冻结显示
+    updateTickState(); // 定时器仍在倒计时时保持走表
     persistSession();
   });
 
@@ -295,6 +333,28 @@
       storage.remove(HISTORY_KEY);
       renderHistory();
     }
+  });
+
+  // ---------- 定时停止（预设档位，点选即生效） ----------
+  function renderSleepTimerOptions() {
+    sleepTimerOptions.querySelectorAll('button[data-min]').forEach((btn) => {
+      btn.classList.toggle('active', parseInt(btn.dataset.min, 10) === sleepTimerMin);
+    });
+  }
+
+  sleepTimerBtn.addEventListener('click', () => {
+    renderSleepTimerOptions();
+    sleepTimerModal.hidden = false;
+  });
+  sleepTimerClose.addEventListener('click', () => { sleepTimerModal.hidden = true; });
+  sleepTimerModal.addEventListener('click', (e) => {
+    if (e.target === sleepTimerModal) sleepTimerModal.hidden = true;
+  });
+  sleepTimerOptions.querySelectorAll('button[data-min]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setSleepTimer(parseInt(btn.dataset.min, 10));
+      sleepTimerModal.hidden = true;
+    });
   });
 
   // ---------- 启动：归档上次会话 → 加载录音并尝试自动播放 ----------
