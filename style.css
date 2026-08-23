@@ -93,7 +93,7 @@ h1 {
   outline-offset: 6px;
 }
 
-/* ---------- 提示与音量 ---------- */
+/* ---------- 提示 ---------- */
 
 .hint {
   min-height: 18px;
@@ -101,34 +101,8 @@ h1 {
   color: #8b94bd;
 }
 
-.volume-row {
-  margin-top: 30px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 14px;
-}
-
-.field {
-  font-size: 14px;
-  color: #b8c0dd;
-}
-
-input[type="range"] {
-  width: 180px;
-  accent-color: #9aa8ff;
-}
-
-.volume-value {
-  font-size: 13px;
-  color: #9aa3c7;
-  min-width: 42px;
-  text-align: left;
-  font-variant-numeric: tabular-nums;
-}
-
 .tip {
-  margin-top: 26px;
+  margin-top: 30px;
   font-size: 12px;
   line-height: 1.7;
   color: #6c74a0;

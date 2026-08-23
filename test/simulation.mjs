@@ -2,7 +2,7 @@
 //
 // 原理：把真实的 app.js 放入 Node 虚拟机，用模拟的 Audio/MediaSession/localStorage 驱动，
 // 断言：自动播放尝试、点按呼吸圆圈切换播放/暂停、被浏览器拦截后的兜底流程、
-//       锁屏控件（Media Session handlers）、音量持久化、WAV 音源格式与确定性。
+//       锁屏控件（Media Session handlers）、音量交由设备控制、WAV 音源格式与确定性。
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -84,10 +84,9 @@ function loadApp({ blocked = false } = {}) {
   };
 
   const els = {};
-  for (const id of ['circle', 'stateLabel', 'hint', 'volume', 'volumeValue']) {
+  for (const id of ['circle', 'stateLabel', 'hint']) {
     els[id] = makeElement(id);
   }
-  els.volume.value = '70';
 
   const sandbox = {
     document: { getElementById: (id) => els[id] },
@@ -156,32 +155,24 @@ appA.msHandlers.play();
 await flush();
 assert.ok(!appA.audio.paused, '锁屏播放控件应生效');
 
-// ---------- 场景 E：音量持久化 ----------
-appA.els.volume.value = '35';
-appA.els.volume.fire('input');
-assert.ok(Math.abs(appA.audio.volume - 0.35) < 1e-9, '音量应为 0.35');
-assert.strictEqual(appA.els.volumeValue.textContent, '35%', '音量百分比文案');
-assert.strictEqual(store.get('babyShush.volume'), '35', '音量应已缓存');
-
-const appE = loadApp(); // 重新打开
+// 音量完全由设备硬件控制，不应设置程序音量（保持元素默认值 1）
+const appD = loadApp();
 await flush();
-assert.ok(Math.abs(appE.audio.volume - 0.35) < 1e-9, '重开后音量应恢复 0.35');
-assert.strictEqual(appE.els.volumeValue.textContent, '35%');
+assert.strictEqual(appD.audio.volume, 1, '不应再设置程序音量');
 
-// ---------- 场景 F：WAV 音源格式与确定性（真实 Blob） ----------
-const bytes = Buffer.from(await appE.generateShushWav().arrayBuffer());
+// ---------- 场景 E：WAV 音源格式与确定性（真实 Blob） ----------
+const bytes = Buffer.from(await appD.generateShushWav().arrayBuffer());
 assert.strictEqual(bytes.length, 44 + 12 * 22050 * 2, 'WAV 总长 = 44 字节头 + 12s×22050×2B');
 assert.strictEqual(bytes.toString('ascii', 0, 4), 'RIFF');
 assert.strictEqual(bytes.toString('ascii', 8, 12), 'WAVE');
 assert.strictEqual(bytes.readUInt16LE(22), 1, '单声道');
 assert.strictEqual(bytes.readUInt32LE(24), 22050, '采样率 22050');
 assert.strictEqual(bytes.readUInt16LE(34), 16, '16 位 PCM');
-const bytes2 = Buffer.from(await appE.generateShushWav().arrayBuffer());
+const bytes2 = Buffer.from(await appD.generateShushWav().arrayBuffer());
 assert.ok(bytes2.equals(bytes), '固定种子应生成完全一致的音源');
 
 console.log('✓ 场景A：进入页面自动播放（loop、blob 音源、播放态 UI 正确）');
 console.log('✓ 场景B：点按呼吸圆圈在 播放/暂停 间切换，文案与样式同步');
 console.log('✓ 场景C：自动播放被浏览器拦截时提示「轻触开始」，轻触后正常播放');
-console.log('✓ 场景D：锁屏/耳机播放暂停控件与元数据（Media Session）正确');
-console.log('✓ 场景E：音量调节持久化，重开后恢复');
-console.log('✓ 场景F：WAV 音源格式、长度与确定性校验通过');
+console.log('✓ 场景D：锁屏/耳机播放暂停控件与元数据（Media Session）正确；音量交由设备硬件控制');
+console.log('✓ 场景E：WAV 音源格式、长度与确定性校验通过');

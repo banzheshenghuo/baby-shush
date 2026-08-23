@@ -4,27 +4,6 @@
   const circle = document.getElementById('circle');
   const stateLabel = document.getElementById('stateLabel');
   const hint = document.getElementById('hint');
-  const volumeSlider = document.getElementById('volume');
-  const volumeValue = document.getElementById('volumeValue');
-
-  const PREF_KEYS = {
-    volume: 'babyShush.volume',
-  };
-
-  function loadPref(key, fallback) {
-    try {
-      const v = localStorage.getItem(key);
-      return v === null ? fallback : v;
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  function savePref(key, value) {
-    try {
-      localStorage.setItem(key, value);
-    } catch (_) { /* 忽略存储失败 */ }
-  }
 
   // ---------- 「嘘」声音源：程序化生成（棕噪声 + 缓慢起伏 + 首尾交叉淡化的无缝循环） ----------
   // 用固定种子保证每次生成的声音一致
@@ -155,23 +134,9 @@
     }
   }
 
-  // ---------- 音量（iOS 不支持程序音量，由硬件音量键控制） ----------
-  function applyVolume(v) {
-    audio.volume = v;
-    volumeSlider.value = String(Math.round(v * 100));
-    volumeValue.textContent = Math.round(v * 100) + '%';
-  }
-
-  volumeSlider.addEventListener('input', () => {
-    const v = parseInt(volumeSlider.value, 10) / 100;
-    applyVolume(v);
-    savePref(PREF_KEYS.volume, String(Math.round(v * 100)));
-  });
-
   // ---------- 启动：生成音源并尝试自动播放 ----------
   (function init() {
     audio.src = URL.createObjectURL(generateShushWav());
-    applyVolume(parseInt(loadPref(PREF_KEYS.volume, '70'), 10) / 100);
     updateUI();
     tryPlay(); // 进入页面即播放；被浏览器策略拦截时等待轻触圆圈
   })();
