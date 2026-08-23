@@ -108,6 +108,138 @@ h1 {
   color: #6c74a0;
 }
 
+/* ---------- 本次计时 ---------- */
+
+.timer {
+  margin-top: 14px;
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: #9aa3c7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 历史记录 ---------- */
+
+.history-btn {
+  margin-top: 16px;
+  background: none;
+  border: 1px solid rgba(200, 208, 255, 0.28);
+  color: #9aa3c7;
+  border-radius: 999px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-family: inherit;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.history-btn:active {
+  transform: scale(0.97);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 6, 10, 0.65);
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-card {
+  width: min(420px, 100%);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: #161b3a;
+  border: 1px solid rgba(200, 208, 255, 0.16);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-head h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: #8b94bd;
+  font-size: 18px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.history-total {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  color: #8b94bd;
+}
+
+.history-list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid rgba(200, 208, 255, 0.1);
+  font-size: 14px;
+}
+
+.history-list li:last-child {
+  border-bottom: none;
+}
+
+.history-list .when {
+  color: #8b94bd;
+}
+
+.history-list .dur {
+  color: #dfe4f7;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-list li.empty {
+  justify-content: center;
+  color: #6c74a0;
+  border-bottom: none;
+  padding: 26px 0;
+}
+
+.history-clear {
+  margin-top: 12px;
+  align-self: center;
+  background: none;
+  border: none;
+  color: rgba(255, 160, 160, 0.75);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
 /* 尊重系统「减弱动态效果」设置 */
 @media (prefers-reduced-motion: reduce) {
   .breath-circle {

@@ -144,8 +144,154 @@
     }
   }
 
-  // ---------- 启动：加载录音并尝试自动播放 ----------
+  // ---------- 播放计时与历史记录 ----------
+  const timerEl = document.getElementById('timer');
+  const historyBtn = document.getElementById('historyBtn');
+  const historyModal = document.getElementById('historyModal');
+  const historyClose = document.getElementById('historyClose');
+  const historyTotal = document.getElementById('historyTotal');
+  const historyList = document.getElementById('historyList');
+  const historyClear = document.getElementById('historyClear');
+
+  const HISTORY_KEY = 'babyShush.history';
+  const SESSION_KEY = 'babyShush.session';
+  const HISTORY_LIMIT = 100;
+
+  const storage = {
+    get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {} },
+    remove(key) { try { localStorage.removeItem(key); } catch (_) {} },
+  };
+
+  let accumulatedMs = 0; // 本次会话已播放的累计毫秒（暂停期间不增长）
+  let playingSince = 0;  // 当前连续播放段的起点（墙钟，息屏 / 后台播放照常累计）
+  let tickTimer = null;
+  let lastFlush = 0;
+
+  function sessionMs() {
+    return accumulatedMs + (audio.paused || !playingSince ? 0 : Date.now() - playingSince);
+  }
+
+  function fmtClock(ms) { // 本次计时 MM:SS（满 1 小时显示 H:MM:SS）
+    const s = Math.floor(ms / 1000);
+    const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+    const two = (n) => String(n).padStart(2, '0');
+    return hh > 0 ? `${hh}:${two(mm)}:${two(ss)}` : `${two(mm)}:${two(ss)}`;
+  }
+
+  function fmtDuration(ms) { // 历史条目用的自然语言时长
+    const s = Math.round(ms / 1000);
+    const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+    if (hh > 0) return `${hh}时${mm}分`;
+    if (mm > 0) return `${mm}分${String(ss).padStart(2, '0')}秒`;
+    return `${ss}秒`;
+  }
+
+  function persistSession() {
+    lastFlush = Date.now();
+    storage.set(SESSION_KEY, { d: Math.floor(sessionMs()), t: lastFlush });
+  }
+
+  function renderTimer() {
+    timerEl.textContent = `本次 ${fmtClock(sessionMs())}`;
+    // 播放中每 10 秒落一次盘，应用被强杀也能在历史里找回这段时长
+    if (!audio.paused && Date.now() - lastFlush > 10000) persistSession();
+  }
+
+  function loadHistory() {
+    const list = storage.get(HISTORY_KEY);
+    return Array.isArray(list) ? list : [];
+  }
+
+  function appendHistory(entry) {
+    const list = loadHistory();
+    list.push(entry);
+    while (list.length > HISTORY_LIMIT) list.shift();
+    storage.set(HISTORY_KEY, list);
+  }
+
+  // 上次运行残留的未归档会话（关闭或被强杀前落盘的）转入历史，本次计时从零开始
+  function recoverPreviousSession() {
+    const prev = storage.get(SESSION_KEY);
+    storage.remove(SESSION_KEY);
+    if (prev && typeof prev.d === 'number' && prev.d >= 1000) {
+      appendHistory({ t: typeof prev.t === 'number' ? prev.t : Date.now(), d: prev.d });
+    }
+  }
+
+  audio.addEventListener('play', () => {
+    playingSince = Date.now();
+    timerEl.hidden = false;
+    renderTimer();
+    clearInterval(tickTimer);
+    tickTimer = setInterval(renderTimer, 500);
+  });
+
+  audio.addEventListener('pause', () => {
+    if (!playingSince) return;
+    accumulatedMs += Date.now() - playingSince;
+    playingSince = 0;
+    clearInterval(tickTimer);
+    renderTimer(); // 冻结显示
+    persistSession();
+  });
+
+  // 页面关闭 / 切后台时落盘；播放中的时长照常累计（锁屏播放是主场景）
+  window.addEventListener('pagehide', persistSession);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) persistSession(); });
+
+  function fmtWhen(ms) {
+    const d = new Date(ms);
+    const two = (n) => String(n).padStart(2, '0');
+    const now = new Date();
+    const date = d.getFullYear() === now.getFullYear()
+      ? `${d.getMonth() + 1}月${d.getDate()}日`
+      : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    return `${date} ${two(d.getHours())}:${two(d.getMinutes())}`;
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = '';
+    const list = loadHistory();
+    if (!list.length) {
+      historyTotal.textContent = '';
+      historyList.innerHTML = '<li class="empty">还没有哄睡记录</li>';
+      return;
+    }
+    const total = list.reduce((sum, e) => sum + (e.d || 0), 0);
+    historyTotal.textContent = `共 ${list.length} 次 · 累计 ${fmtDuration(total)}`;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const li = document.createElement('li');
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = fmtWhen(list[i].t);
+      const dur = document.createElement('span');
+      dur.className = 'dur';
+      dur.textContent = fmtDuration(list[i].d);
+      li.append(when, dur);
+      historyList.append(li);
+    }
+  }
+
+  historyBtn.addEventListener('click', () => {
+    renderHistory();
+    historyModal.hidden = false;
+  });
+  historyClose.addEventListener('click', () => { historyModal.hidden = true; });
+  historyModal.addEventListener('click', (e) => {
+    if (e.target === historyModal) historyModal.hidden = true;
+  });
+  historyClear.addEventListener('click', () => {
+    if (!loadHistory().length || confirm('确定清空全部哄睡记录吗？')) {
+      storage.remove(HISTORY_KEY);
+      renderHistory();
+    }
+  });
+
+  // ---------- 启动：归档上次会话 → 加载录音并尝试自动播放 ----------
   (function init() {
+    recoverPreviousSession();
+    lastFlush = Date.now(); // 节流起点，避免刚启动就误触发落盘
     audio.src = AUDIO_FILE;
     updateUI();
     tryPlay(); // 进入页面即播放；被浏览器策略拦截时等待轻触圆圈

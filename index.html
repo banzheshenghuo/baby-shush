@@ -24,8 +24,24 @@
 
     <p class="hint" id="hint">轻触中间的圆圈开始播放</p>
 
+    <p class="timer" id="timer" hidden>本次 00:00</p>
+
     <p class="tip">音量请用设备音量键调节 · 建议声源距婴儿耳侧约 30–50 cm，配合轻拍安抚效果更好</p>
+
+    <button class="history-btn" id="historyBtn">历史记录</button>
   </main>
+
+  <div class="modal" id="historyModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="历史记录">
+      <div class="modal-head">
+        <h2>哄睡历史</h2>
+        <button class="modal-close" id="historyClose" aria-label="关闭历史记录">✕</button>
+      </div>
+      <p class="history-total" id="historyTotal"></p>
+      <ul class="history-list" id="historyList"></ul>
+      <button class="history-clear" id="historyClear">清空历史</button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

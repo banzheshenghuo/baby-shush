@@ -3,7 +3,7 @@
 // 原理：把真实的 app.js 放入 Node 虚拟机，用模拟的 Audio/MediaSession/localStorage 驱动，
 // 断言：自动播放尝试、点按呼吸圆圈切换播放/暂停、被浏览器拦截后的兜底流程、
 //       锁屏控件（Media Session handlers）、音量交由设备控制、本地录音音源与加载失败回退、
-//       合成兜底 WAV 的格式与确定性。
+//       合成兜底 WAV 的格式与确定性、播放计时（走表/停表）、关闭归档与历史面板。
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -39,9 +39,23 @@ function makeElement(id) {
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
     click() { (this.listeners.click || []).forEach(fn => fn({ target: this })); },
     fire(type) { (this.listeners[type] || []).forEach(fn => fn({ target: this })); },
+    append(...kids) { (this.children ||= []).push(...kids); },
   };
+  Object.defineProperty(el, 'innerHTML', {
+    get() { return this._innerHTML || ''; },
+    set(v) { if (v === '') this.children = []; this._innerHTML = v; },
+  });
   return attachClassList(el);
 }
+
+// 可控时钟：app.js 的计时全部走 Date.now() / new Date()，测试里统一替换为可拨动的假时钟
+const RealDate = Date;
+let fakeNow = RealDate.parse('2026-08-22T14:00:00');
+class FakeDate extends RealDate {
+  constructor(...args) { if (args.length === 0) args = [fakeNow]; super(...args); }
+  static now() { return fakeNow; }
+}
+const advanceClock = (ms) => { fakeNow += ms; };
 
 // 可配置的 Audio 模拟：blocked = 首次 play() 被浏览器自动播放策略拒绝
 function makeAudioClass(log, blocked) {
@@ -85,17 +99,31 @@ function loadApp({ blocked = false } = {}) {
   };
 
   const els = {};
-  for (const id of ['circle', 'stateLabel', 'hint']) {
+  for (const id of ['circle', 'stateLabel', 'hint', 'timer', 'historyBtn', 'historyModal', 'historyClose', 'historyTotal', 'historyList', 'historyClear']) {
     els[id] = makeElement(id);
   }
 
+  const intervalFns = [];
+  const winListeners = {};
+
   const sandbox = {
-    document: { getElementById: (id) => els[id] },
+    document: {
+      getElementById: (id) => els[id],
+      hidden: false,
+      addEventListener: () => {},
+      createElement: () => makeElement(''),
+    },
     navigator: { mediaSession },
     localStorage: {
       getItem: (k) => (store.has(k) ? store.get(k) : null),
       setItem: (k, v) => store.set(k, v),
+      removeItem: (k) => store.delete(k),
     },
+    addEventListener: (t, fn) => { (winListeners[t] ||= []).push(fn); },
+    setInterval: (fn) => { intervalFns.push(fn); return intervalFns.length; },
+    clearInterval: () => {},
+    confirm: () => true,
+    Date: FakeDate,
     Audio: makeAudioClass(audioLog, blocked),
     MediaMetadata: class { constructor(m) { Object.assign(this, m); } },
     URL,    // Node 原生，支持 createObjectURL(Blob)
@@ -112,6 +140,8 @@ function loadApp({ blocked = false } = {}) {
     audio: sandbox.__babyShush.audio,
     generateShushWav: sandbox.__babyShush.generateShushWav,
     isUsingFallback: sandbox.__babyShush.isUsingFallback,
+    tick: () => intervalFns.forEach(fn => fn()),
+    fireWindow: (t) => (winListeners[t] || []).forEach(fn => fn()),
   };
 }
 
@@ -188,9 +218,58 @@ const before = appF.audio.src;
 await flush();
 assert.strictEqual(appF.audio.src, before, '重复 error 不应再次切换音源');
 
+// ---------- 场景 G：本次播放计时（播放走表、暂停停表、恢复后继续累加） ----------
+const appG = loadApp();
+await flush();
+advanceClock(5000);
+appG.tick();
+assert.strictEqual(appG.els.timer.textContent, '本次 00:05', '播放中应走表');
+appG.els.circle.click();
+await flush();
+advanceClock(10000);
+appG.tick();
+assert.strictEqual(appG.els.timer.textContent, '本次 00:05', '暂停后应停表且不累计');
+appG.els.circle.click();
+await flush();
+advanceClock(5000);
+appG.tick();
+assert.strictEqual(appG.els.timer.textContent, '本次 00:10', '恢复播放应从原值继续累加');
+
+// ---------- 场景 H：关闭应用 → 上次时长归档进历史，重新进入计时归零 ----------
+appG.fireWindow('pagehide');
+assert.strictEqual(JSON.parse(appG.store.get('babyShush.session')).d, 10000, '关闭时应落盘会话时长');
+advanceClock(60000);
+const appH = loadApp();
+await flush();
+assert.strictEqual(appH.els.timer.textContent, '本次 00:00', '重新进入后本次计时归零');
+assert.strictEqual(appH.store.has('babyShush.session'), false, '残留会话应被清理');
+const hist1 = JSON.parse(appH.store.get('babyShush.history'));
+assert.strictEqual(hist1.length, 1, '历史应有 1 条记录');
+assert.strictEqual(hist1[0].d, 10000, '历史时长应为上一会话的 10 秒');
+
+// ---------- 场景 I：历史记录面板（查看 / 关闭 / 清空） ----------
+advanceClock(65000);
+appH.tick();
+assert.strictEqual(appH.els.timer.textContent, '本次 01:05', '新会话从零重新计时');
+appH.els.historyBtn.click();
+assert.strictEqual(appH.els.historyModal.hidden, false, '应打开历史面板');
+assert.strictEqual(appH.els.historyTotal.textContent, '共 1 次 · 累计 10秒', '汇总行正确');
+const liRow = appH.els.historyList.children[0];
+assert.ok(liRow.children[0].textContent.includes('8月22日'), '记录应含日期');
+assert.strictEqual(liRow.children[1].textContent, '10秒', '记录时长正确');
+appH.els.historyClose.click();
+assert.strictEqual(appH.els.historyModal.hidden, true, '应能关闭历史面板');
+appH.els.historyBtn.click();
+appH.els.historyClear.click();
+assert.strictEqual(appH.els.historyList.children.length, 0, '清空后列表为空');
+assert.ok(appH.els.historyList.innerHTML.includes('还没有哄睡记录'), '清空后应有空态提示');
+
 console.log('✓ 场景A：进入页面自动播放（loop、本地录音音源、播放态 UI 正确）');
 console.log('✓ 场景B：点按呼吸圆圈在 播放/暂停 间切换，文案与样式同步');
 console.log('✓ 场景C：自动播放被浏览器拦截时提示「轻触开始」，轻触后正常播放');
 console.log('✓ 场景D：锁屏/耳机播放暂停控件与元数据（Media Session）正确；音量交由设备硬件控制');
 console.log('✓ 场景E：合成兜底 WAV 格式、长度与确定性校验通过');
 console.log('✓ 场景F：录音加载失败时自动回退合成音源并续播，且回退只发生一次');
+console.log('✓ 场景G：播放计时走表 / 暂停停表 / 恢复继续累加');
+console.log('✓ 场景H：关闭应用时上次时长归档进历史，重新进入本次计时归零');
+console.log('✓ 场景I：历史记录面板的查看、汇总、关闭与清空');
