@@ -106,7 +106,7 @@ function loadApp({ blocked = false } = {}) {
   }
 
   // 定时面板的选项按钮（真实页面由 querySelectorAll('button[data-min]') 取出）
-  const timerOptionBtns = [0, 15, 30, 60].map((min) => {
+  const timerOptionBtns = [0, 15, 30, 45, 60].map((min) => {
     const b = makeElement('opt' + min);
     b.dataset = { min: String(min) };
     return b;
@@ -346,15 +346,15 @@ await flush();
 assert.ok(appJ.audio.paused, '到点应自动暂停播放');
 assert.ok(!appJ.els.timer.textContent.includes('后停止'), '到点后不应再显示倒计时');
 
-// 取消：重新设置后再选「不定时」，到点不再停止
+// 取消：重新设置 45 分钟后再选「不定时」，到点不再停止（顺带覆盖新增档位）
 appJ.els.circle.click();          // 手动恢复播放
 await flush();
 appJ.els.sleepTimerBtn.click();
-appJ.timerOptionBtns[3].click();  // 1 小时
+appJ.timerOptionBtns[3].click();  // 45 分钟
 appJ.els.sleepTimerBtn.click();
 assert.ok(appJ.timerOptionBtns[3].classList.contains('active'), '选中档位应高亮');
 appJ.timerOptionBtns[0].click();  // 不定时（取消）
-advanceClock(61 * 60000);
+advanceClock(46 * 60000);
 appJ.fireDueTimeouts();
 await flush();
 assert.ok(!appJ.audio.paused, '取消后到点不应停止播放');
