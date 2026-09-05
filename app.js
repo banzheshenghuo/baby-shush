@@ -6,7 +6,7 @@
   const hint = document.getElementById('hint');
 
   // ---------- 「嘘」声兜底音源：程序化合成（棕噪声 + 缓慢起伏 + 首尾交叉淡化的无缝循环） ----------
-  // 常规播放使用本地录音 audio/xuxu.mp3；仅当录音加载失败时回退到这里。固定种子保证每次生成一致
+  // 常规播放使用本地录音 audio/hongshui.mp3；仅当录音加载失败时回退到这里。固定种子保证每次生成一致
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
@@ -75,7 +75,7 @@
   }
 
   // ---------- 播放（HTMLAudioElement：可被系统媒体通知接管，锁屏 / 息屏继续播放） ----------
-  const AUDIO_FILE = 'audio/xuxu.mp3'; // 随仓库分发的真实「嘘」声录音，循环播放
+  const AUDIO_FILE = 'audio/hongshui.mp3'; // 随仓库分发的真实白噪音录音（洪水声），循环播放
   const audio = new Audio();
   audio.loop = true;
   audio.preload = 'auto';

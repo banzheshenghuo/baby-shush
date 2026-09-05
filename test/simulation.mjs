@@ -171,7 +171,7 @@ await flush();
 assert.strictEqual(appA.audioLog.filter(x => x === 'play').length, 1, '加载后应尝试自动播放一次');
 assert.ok(!appA.audio.paused, '自动播放成功后应为播放中');
 assert.ok(appA.audio.loop, '应循环播放');
-assert.strictEqual(appA.audio.src, 'audio/xuxu.mp3', '音源应为本地录音文件');
+assert.strictEqual(appA.audio.src, 'audio/hongshui.mp3', '音源应为本地录音文件');
 assert.strictEqual(appA.els.stateLabel.textContent, '嘘…', '状态文案应为 嘘…');
 assert.ok(appA.els.circle.classList.contains('playing'), '圆圈应为播放态样式');
 
@@ -253,7 +253,7 @@ assert.ok(bytes2.equals(bytes), '固定种子应生成完全一致的音源');
 // ---------- 场景 F：录音文件加载失败 → 回退程序化合成并重新播放 ----------
 const appF = loadApp();
 await flush();
-assert.strictEqual(appF.audio.src, 'audio/xuxu.mp3', '初始音源为录音文件');
+assert.strictEqual(appF.audio.src, 'audio/hongshui.mp3', '初始音源为录音文件');
 assert.ok(!appF.isUsingFallback(), '初始不在回退模式');
 (appF.audio.listeners.error || []).forEach(fn => fn());
 await flush();
